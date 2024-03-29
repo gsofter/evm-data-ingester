@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Transaction" ALTER COLUMN "gas" SET DATA TYPE TEXT,
+ALTER COLUMN "gasPrice" DROP NOT NULL;
+
+-- AddForeignKey
+ALTER TABLE "Log" ADD CONSTRAINT "Log_blockNumber_fkey" FOREIGN KEY ("blockNumber") REFERENCES "Block"("number") ON DELETE RESTRICT ON UPDATE CASCADE;

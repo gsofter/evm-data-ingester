@@ -15,13 +15,50 @@ datasource db {
 
 // Define the PostgreSQL data model
 model Block {
-  number     Int      @id
-  hash       String   @unique
-  parentHash String
-  nonce      String?
-  difficulty String
-  gasLimit   Int
-  gasUsed    Int
-  miner      String
-  timestamp  DateTime
+  number      Int           @id
+  hash        String        @unique
+  parentHash  String
+  nonce       String?
+  difficulty  Int
+  gasLimit    String
+  gasUsed     String
+  miner       String
+  timestamp   Int
+  extraData   String
+  Transaction Transaction[]
+  Log         Log[]
+}
+
+model Transaction {
+  id          Int     @default(autoincrement())
+  hash        String  @id
+  blockNumber Int
+  blockHash   String
+  nonce       Int
+  from        String
+  to          String?
+  value       String
+  gas         String
+  gasPrice    String?
+  input       String
+
+  // Define a relation to the Block model
+  block Block @relation(fields: [blockNumber], references: [number])
+  Log   Log[]
+}
+
+model Log {
+  id              Int      @id @default(autoincrement())
+  transactionHash String
+  logIndex        Int
+  blockNumber     Int
+  blockHash       String
+  address         String
+  data            String
+  topics          String[]
+  removed         Boolean
+
+  // Define a relation to the Transaction model
+  transaction Transaction @relation(fields: [transactionHash], references: [hash])
+  block       Block       @relation(fields: [blockNumber], references: [number])
 }
