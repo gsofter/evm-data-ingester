@@ -48,8 +48,11 @@ export class EthereumDataIngester {
       });
 
       for (const tx of block.transactions) {
-        await this.prisma.transaction.create({
-          data: {
+        await this.prisma.transaction.upsert({
+          where: {
+            hash: tx.hash,
+          },
+          create: {
             hash: tx.hash,
             blockNumber: blockNumber,
             blockHash: block.hash,
@@ -58,7 +61,18 @@ export class EthereumDataIngester {
             to: tx.to,
             value: tx.value.toString(),
             gas: tx.gasLimit.toString(),
-            gasPrice: tx.gasPrice?.toString() || "",
+            gasPrice: tx.gasPrice?.toString(),
+            input: tx.data,
+          },
+          update: {
+            blockNumber: blockNumber,
+            blockHash: block.hash,
+            nonce: tx.nonce,
+            from: tx.from,
+            to: tx.to,
+            value: tx.value.toString(),
+            gas: tx.gasLimit.toString(),
+            gasPrice: tx.gasPrice?.toString(),
             input: tx.data,
           },
         });
