@@ -19,7 +19,7 @@ model Block {
   hash         String        @unique
   parentHash   String
   nonce        String?
-  difficulty   Int
+  difficulty   BigInt
   gasLimit     String
   gasUsed      String
   miner        String
@@ -69,7 +69,7 @@ model InternalTransaction {
 }
 
 model Log {
-  id              Int      @id @default(autoincrement())
+  id              Int         @id @default(autoincrement())
   transactionHash String
   logIndex        Int
   blockNumber     Int
@@ -78,10 +78,8 @@ model Log {
   data            String
   topics          String[]
   removed         Boolean
-
-  // Define a relation to the Transaction model
-  transaction Transaction @relation(fields: [transactionHash], references: [hash])
-  block       Block       @relation(fields: [blockNumber], references: [number])
+  Block           Block       @relation(fields: [blockNumber], references: [number])
+  Transaction     Transaction @relation(fields: [transactionHash], references: [hash])
 
   @@unique([transactionHash, logIndex])
   @@index([transactionHash, logIndex])

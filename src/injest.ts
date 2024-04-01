@@ -1,13 +1,32 @@
 import { Redis } from "ioredis";
 import { EthereumDataIngester } from "./controllers/ethereum-data-ingestor";
-// Specify Ethereum provider URL and PostgreSQL database URL
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+const fromBlock = parseInt(args[0]);
+const toBlock = parseInt(args[1]);
+
+// Check if fromBlock and toBlock are valid numbers
+if (
+  isNaN(fromBlock) ||
+  isNaN(toBlock) ||
+  fromBlock > toBlock ||
+  fromBlock < 0
+) {
+  console.error(
+    "Invalid block numbers. Please provide valid block numbers for <from> and <to>."
+  );
+  process.exit(1);
+}
+
+console.log(`Fetching data for blocks from ${fromBlock} to ${toBlock}`);
+
 const providerUrl = process.env.RPC_PROVIDER_URL || "https://eth.llamarpc.com";
-const redisUrl = "redis://localhost:6379";
+const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 
 // Create an instance of EthereumDataIngester class
 const dataIngester = new EthereumDataIngester(providerUrl, redisUrl);
 
-console.log("redisUrl => ", redisUrl);
 const sub = new Redis(redisUrl);
 sub.subscribe(
   "transaction",
@@ -51,16 +70,20 @@ sub.on("error", function (error) {
   console.dir(error);
 });
 
-// Random block number for trial purpose
-const blockNumber = 19562371;
+// Fetch and process data for each block within the specified range
+for (let blockNumber = fromBlock; blockNumber <= toBlock; blockNumber++) {
+  dataIngester
+    .startFetchingBlockData(blockNumber)
+    .catch((error) =>
+      console.error(
+        `Error fetching and storing data for block ${blockNumber}:`,
+        error
+      )
+    );
+}
 
-dataIngester
-  .startFetchingBlockData(blockNumber)
-  .catch((error) => console.error("Error fetching and storing data:", error))
-  .finally(async () => {
-    // sub.disconnect();
-    // dataIngester.disconnectDB();
-    // dataIngester.disconnectRedis();
-
-    console.log("Done");
-  });
+// Disconnect from database and Redis after processing
+process.on("exit", async () => {
+  await dataIngester.disconnectDB();
+  await dataIngester.disconnectRedis();
+});

@@ -89,6 +89,8 @@ export class EthereumDataIngester {
         console.log(`Tx for ${tx.hash} queued.`);
       }
       console.log(`Transactions for block ${blockNumber} queued successfully.`);
+
+      this.fetchLogs(blockNumber);
     } catch (error) {
       console.error(
         `Error storing transactions for block ${blockNumber}:`,
@@ -119,70 +121,82 @@ export class EthereumDataIngester {
   }
 
   async storeBlock(block: IBlock) {
-    const { number, ...updates } = block;
-    // create new block or update existing one
-    await this.prisma.block.upsert({
-      where: {
-        number: block.number,
-      },
-      create: {
-        number: block.number,
-        ...updates,
-      },
-      update: {
-        ...updates,
-      },
-    });
+    try {
+      const { number, ...updates } = block;
+      // create new block or update existing one
+      await this.prisma.block.upsert({
+        where: {
+          number: block.number,
+        },
+        create: {
+          number: block.number,
+          ...updates,
+        },
+        update: {
+          ...updates,
+        },
+      });
 
-    console.log(`Block stored for ${block.number}`);
+      console.log(`Block stored for ${block.number}`);
+    } catch (error) {
+      console.error(`Error storing block for ${block.number}`, error);
+    }
   }
 
   async storeTransaction(tx: ITransaction) {
     const { hash, ...updates } = tx;
-    await this.prisma.transaction.upsert({
-      where: {
-        hash,
-      },
-      create: {
-        hash,
-        ...updates,
-      },
-      update: {
-        ...updates,
-      },
-    });
+    try {
+      await this.prisma.transaction.upsert({
+        where: {
+          hash,
+        },
+        create: {
+          hash,
+          ...updates,
+        },
+        update: {
+          ...updates,
+        },
+      });
 
-    console.log(`Tx stored for ${tx.hash}`);
+      this.publishToRedis("internal-transaction", { hash: tx.hash });
 
-    this.publishToRedis("internal-transaction", { hash: tx.hash });
+      console.log(`Tx stored for ${tx.hash}`);
+    } catch (error) {
+      console.error(`Error storing transaction for ${hash}`, error);
+    }
   }
 
   async storeLog(log: ethers.providers.Log) {
-    const logFound = await this.prisma.log.findFirst({
-      where: {
-        transactionHash: log.transactionHash,
-      },
-    });
+    try {
+      const logFound = await this.prisma.log.findFirst({
+        where: {
+          transactionHash: log.transactionHash,
+        },
+      });
 
-    if (logFound) {
-      console.log(`Log for ${log.transactionHash} existing`);
-      return;
+      if (logFound) {
+        console.log(`Log for ${log.transactionHash} existing`);
+        return;
+      }
+
+      await this.prisma.log.create({
+        data: {
+          transactionHash: log.transactionHash,
+          logIndex: log.logIndex,
+          blockNumber: log.blockNumber,
+          blockHash: log.blockHash,
+          address: log.address,
+          data: log.data,
+          topics: log.topics,
+          removed: log.removed,
+        },
+      });
+
+      console.log(`Log stored for ${log.transactionHash}`);
+    } catch (error) {
+      console.error(`Error storing log for ${log.transactionHash}`, error);
     }
-
-    await this.prisma.log.create({
-      data: {
-        transactionHash: log.transactionHash,
-        logIndex: log.logIndex,
-        blockNumber: log.blockNumber,
-        blockHash: log.blockHash,
-        address: log.address,
-        data: log.data,
-        topics: log.topics,
-        removed: log.removed,
-      },
-    });
-
-    console.log(`Log stored for ${log.transactionHash}`);
   }
 
   async fetchAndStoreInternalTransactions(txData: any): Promise<void> {
@@ -249,7 +263,6 @@ export class EthereumDataIngester {
 
   async startFetchingBlockData(blockNumber: number): Promise<void> {
     await this.fetchTransactions(blockNumber);
-    await this.fetchLogs(blockNumber);
   }
 
   async disconnectDB(): Promise<void> {
