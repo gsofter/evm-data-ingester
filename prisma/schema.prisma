@@ -64,6 +64,8 @@ model InternalTransaction {
 
   // Define a relation to the Transaction model
   transactions Transaction @relation(fields: [transactionHash], references: [hash])
+
+  @@index([transactionHash])
 }
 
 model Log {
@@ -80,4 +82,7 @@ model Log {
   // Define a relation to the Transaction model
   transaction Transaction @relation(fields: [transactionHash], references: [hash])
   block       Block       @relation(fields: [blockNumber], references: [number])
+
+  @@unique([transactionHash, logIndex])
+  @@index([transactionHash, logIndex])
 }

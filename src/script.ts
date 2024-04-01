@@ -9,15 +9,21 @@ const dataIngester = new EthereumDataIngester(providerUrl, redisUrl);
 
 console.log("redisUrl => ", redisUrl);
 const sub = new Redis(redisUrl);
-sub.subscribe("transaction", "block", "log", (err, count) => {
-  if (err) {
-    console.error("Failed to subscribe: %s", err.message);
-  } else {
-    console.log(
-      `Subscribed successfully! This client is currently subscribed to ${count} channels.`
-    );
+sub.subscribe(
+  "transaction",
+  "block",
+  "log",
+  "internal-transaction",
+  (err, count) => {
+    if (err) {
+      console.error("Failed to subscribe: %s", err.message);
+    } else {
+      console.log(
+        `Subscribed successfully! This client is currently subscribed to ${count} channels.`
+      );
+    }
   }
-});
+);
 
 sub.on("message", (channel, message) => {
   if (channel === "block") {
@@ -34,6 +40,11 @@ sub.on("message", (channel, message) => {
     const log = JSON.parse(message);
     dataIngester.storeLog(log);
   }
+
+  if (channel === "internal-transaction") {
+    const log = JSON.parse(message);
+    dataIngester.fetchAndStoreInternalTransactions(log);
+  }
 });
 
 sub.on("error", function (error) {
@@ -41,7 +52,7 @@ sub.on("error", function (error) {
 });
 
 // Random block number for trial purpose
-const blockNumber = 19536449;
+const blockNumber = 19562371;
 
 dataIngester
   .startFetchingBlockData(blockNumber)

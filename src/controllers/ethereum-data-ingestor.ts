@@ -154,7 +154,7 @@ export class EthereumDataIngester {
 
     console.log(`Tx stored for ${tx.hash}`);
 
-    this.storeInternalTransaction(tx.hash);
+    this.publishToRedis("internal-transaction", { hash: tx.hash });
   }
 
   async storeLog(log: ethers.providers.Log) {
@@ -164,7 +164,10 @@ export class EthereumDataIngester {
       },
     });
 
-    if (logFound) console.log(`Log for ${log.transactionHash} existing`);
+    if (logFound) {
+      console.log(`Log for ${log.transactionHash} existing`);
+      return;
+    }
 
     await this.prisma.log.create({
       data: {
@@ -182,7 +185,8 @@ export class EthereumDataIngester {
     console.log(`Log stored for ${log.transactionHash}`);
   }
 
-  async storeInternalTransaction(txHash: string): Promise<void> {
+  async fetchAndStoreInternalTransactions(txData: any): Promise<void> {
+    const txHash = txData.hash;
     const foundInDB = await this.prisma.internalTransaction.findFirst({
       where: {
         transactionHash: txHash,
@@ -236,8 +240,8 @@ export class EthereumDataIngester {
           retries++;
         } else {
           console.error("Error fetching internal transactions:", error);
-          // return;
-          throw error;
+          return;
+          // throw error;
         }
       }
     }
