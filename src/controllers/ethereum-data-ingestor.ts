@@ -153,6 +153,8 @@ export class EthereumDataIngester {
     });
 
     console.log(`Tx stored for ${tx.hash}`);
+
+    this.storeInternalTransaction(tx.hash);
   }
 
   async storeLog(log: ethers.providers.Log) {
@@ -181,42 +183,63 @@ export class EthereumDataIngester {
   }
 
   async storeInternalTransaction(txHash: string): Promise<void> {
-    const response = await axios.get(
-      `https://api.etherscan.io/api?module=account&action=txlistinternal&txhash=${txHash}&apikey=${process.env.ETHERSCAN_API_KEY}`
-    );
+    const foundInDB = await this.prisma.internalTransaction.findFirst({
+      where: {
+        transactionHash: txHash,
+      },
+    });
+    if (foundInDB) {
+      // skip to store internal tx
+      console.log(`Skipped storing interanl tx for ${txHash}`);
+      return;
+    }
 
-    if (response.data.status === "1" && response.data.result) {
-      const inTxes = response.data.result;
+    const maxRetries = 3;
+    let retries = 0;
 
-      const found = await this.prisma.internalTransaction.findFirst({
-        where: {
-          transactionHash: txHash,
-        },
-      });
+    while (retries < maxRetries) {
+      try {
+        const response = await axios.get(
+          `https://api.etherscan.io/api?module=account&action=txlistinternal&txhash=${txHash}&apikey=${process.env.ETHERSCAN_API_KEY}`
+        );
+        if (response.data.status === "1" && response.data.result) {
+          const inTxes = response.data.result;
 
-      if (found) {
-        // skip to store internal tx
-        console.log(`Skipped storing interanl tx for ${txHash}`);
-        return;
+          const internalTxMap = inTxes.map((inTx: any) => ({
+            blockNumber: Number(inTx.blockNumber || "0"),
+            from: inTx.from,
+            to: inTx.to,
+            gas: inTx.gas,
+            gasUsed: inTx.gasUsed,
+            input: inTx.input,
+            timestamp: Number(inTx.timestamp || "0"),
+            type: inTx.type,
+            value: inTx.value,
+            transactionHash: txHash,
+          }));
+
+          await this.prisma.internalTransaction.createMany({
+            data: internalTxMap,
+          });
+
+          console.log(`Internal transactions stored for ${txHash}`);
+          return;
+        }
+      } catch (error: any) {
+        if (error.response && error.response.status === 429) {
+          // Rate limit exceeded
+          const waitTime = 1000; // 1 second wait time
+          console.log(
+            `Rate limit exceeded. Retrying after ${waitTime} milliseconds...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, waitTime)); // Wait for waitTime milliseconds
+          retries++;
+        } else {
+          console.error("Error fetching internal transactions:", error);
+          // return;
+          throw error;
+        }
       }
-
-      const internalTxMap = inTxes.map((inTx: any) => ({
-        blockHash: inTx.blockHash,
-        blockNumber: inTx.blockNumber,
-        from: inTx.blockNumber,
-        to: inTx.to,
-        gas: inTx.gas,
-        gasUsed: inTx.gasUsed,
-        input: inTx.input,
-        timestamp: Number(inTx.timestamp || "0"),
-        type: inTx.type,
-        value: inTx.value,
-        transactionHash: inTx.transactionHash,
-      }));
-
-      await this.prisma.internalTransaction.createMany({
-        data: internalTxMap,
-      });
     }
   }
 
