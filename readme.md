@@ -6,7 +6,6 @@ The Ethereum Data Ingester and API Development project aims to develop a system 
 
 ![image](https://github.com/gsofter/evm-data-ingester/assets/49583931/e3b77bfe-604f-440a-80e2-85ba6b6c70a6)
 
-
 ## Technical Stacks
 
 - **Ethers.js and TypeScript**: Used for connecting to the Ethereum blockchain, fetching transactions, and internal transactions.
@@ -33,13 +32,13 @@ ETHERSCAN_API_KEY=<your-etherscan-api-key>
 ```
 
 4. Run `docker-compose up -d` to start the Redis and PostgreSQL services.
-5. Run `npx prisma migrate dev` to run migrations for the PostgreSQL database. 
+5. Run `npx prisma migrate dev` to run migrations for the PostgreSQL database.
 6. Finally, run `npm run dev` to start the Node.js API server
 
-## How to start injesting data from evm
+## How to start ingesting data from evm
 
 ```
-npx ts-node src/injest.ts <from_block> <to_block>
+npx ts-node src/ingest.ts <from_block> <to_block>
 
 ```
 
@@ -59,9 +58,6 @@ To test the `/logs` endpoint:
 - `address`: Specify the address of the contract.
 - `topics`: Specify log topics.
 
-
-
 3. Example request:
 
 `<API_HOST>/logs?address=0x0Df581a7afC09d0A0a55BF864baEf2A4559Bbfe2&topics=0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef&fromBlock=19562372`
-
