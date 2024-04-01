@@ -1,16 +1,44 @@
-import express, { Express, Request, Response, Application } from "express";
-import dotenv from "dotenv";
+import express, { Request, Response } from "express";
+import { PrismaClient } from "@prisma/client";
 
-//For env File
-dotenv.config();
+const prisma = new PrismaClient();
+const app = express();
+const PORT = 3000;
 
-const app: Application = express();
-const port = process.env.PORT || 8000;
+app.use(express.json());
 
-app.get("/", (req: Request, res: Response) => {
-  res.send("Welcome to Express & TypeScript Server");
+// GET /logs endpoint to query logs
+app.get("/logs", async (req: Request, res: Response) => {
+  try {
+    // Extract filter parameters from query string
+    const { fromBlock, toBlock, address, topics } = req.query;
+
+    // Prepare filter object based on query parameters
+    const filter: any = {};
+    if (fromBlock) filter.blockNumber = { gte: parseInt(fromBlock as string) };
+    if (toBlock)
+      filter.blockNumber = {
+        ...filter.blockNumber,
+        lte: parseInt(toBlock as string),
+      };
+    if (address) filter.address = address;
+    if (topics)
+      filter.topics = {
+        has: topics,
+      };
+
+    const logs = await prisma.log.findMany({
+      where: filter,
+    });
+
+    res.json(logs);
+  } catch (error) {
+    console.error("Error querying logs:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
-app.listen(port, () => {
-  console.log(`Server is Fire at http://localhost:${port}`);
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
