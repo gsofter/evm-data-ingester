@@ -4,6 +4,9 @@
 
 The Ethereum Data Ingester and API Development project aims to develop a system for ingesting historical data from the Ethereum blockchain and exposing it through a RESTful API. The system consists of multiple components including a data ingester, PostgreSQL database for storage, Redis for message queuing, and a Node.js server for hosting the API endpoints.
 
+![image](https://github.com/gsofter/evm-data-ingester/assets/49583931/e3b77bfe-604f-440a-80e2-85ba6b6c70a6)
+
+
 ## Technical Stacks
 
 - **Ethers.js and TypeScript**: Used for connecting to the Ethereum blockchain, fetching transactions, and internal transactions.
