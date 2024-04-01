@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 import { PrismaClient } from "@prisma/client";
 import Redis from "ioredis";
+import axios from "axios";
 
 export interface IBlock {
   number: number;
@@ -25,8 +26,8 @@ export interface ITransaction {
   gasPrice?: string;
   data: string;
   value: string;
-  blockNumber?: number;
-  blockHash?: string;
+  blockNumber: number;
+  blockHash: string;
   timestamp?: number;
   confirmations: number;
 }
@@ -42,7 +43,7 @@ export class EthereumDataIngester {
     this.redis = new Redis(redisUrl);
   }
 
-  async publish(channelName: string, messageData: any): Promise<void> {
+  async publishToRedis(channelName: string, messageData: any): Promise<void> {
     await this.redis.publish(channelName, JSON.stringify(messageData));
   }
 
@@ -83,7 +84,8 @@ export class EthereumDataIngester {
           confirmations: tx.confirmations,
         };
 
-        this.publish("transaction", txMessageData);
+        this.publishToRedis("transaction", txMessageData);
+
         console.log(`Tx for ${tx.hash} queued.`);
       }
       console.log(`Transactions for block ${blockNumber} queued successfully.`);
@@ -103,7 +105,7 @@ export class EthereumDataIngester {
       });
 
       for (const log of logs) {
-        this.publish("log", log);
+        this.publishToRedis("log", log);
       }
       console.log(
         `Internal transactions for block ${blockNumber} stored successfully.`
@@ -136,32 +138,17 @@ export class EthereumDataIngester {
   }
 
   async storeTransaction(tx: ITransaction) {
+    const { hash, ...updates } = tx;
     await this.prisma.transaction.upsert({
       where: {
-        hash: tx.hash,
+        hash,
       },
       create: {
-        hash: tx.hash,
-        blockNumber: tx.blockNumber || 0,
-        blockHash: tx.blockHash || "",
-        nonce: tx.nonce,
-        from: tx.from,
-        to: tx.to,
-        value: tx.value,
-        gas: tx.gas,
-        gasPrice: tx.gasPrice,
-        input: tx.data,
+        hash,
+        ...updates,
       },
       update: {
-        blockNumber: tx.blockNumber || 0,
-        blockHash: tx.blockHash || "",
-        nonce: tx.nonce,
-        from: tx.from,
-        to: tx.to,
-        value: tx.value,
-        gas: tx.gas,
-        gasPrice: tx.gasPrice,
-        input: tx.data,
+        ...updates,
       },
     });
 
@@ -191,6 +178,46 @@ export class EthereumDataIngester {
     });
 
     console.log(`Log stored for ${log.transactionHash}`);
+  }
+
+  async storeInternalTransaction(txHash: string): Promise<void> {
+    const response = await axios.get(
+      `https://api.etherscan.io/api?module=account&action=txlistinternal&txhash=${txHash}&apikey=${process.env.ETHERSCAN_API_KEY}`
+    );
+
+    if (response.data.status === "1" && response.data.result) {
+      const inTxes = response.data.result;
+
+      const found = await this.prisma.internalTransaction.findFirst({
+        where: {
+          transactionHash: txHash,
+        },
+      });
+
+      if (found) {
+        // skip to store internal tx
+        console.log(`Skipped storing interanl tx for ${txHash}`);
+        return;
+      }
+
+      const internalTxMap = inTxes.map((inTx: any) => ({
+        blockHash: inTx.blockHash,
+        blockNumber: inTx.blockNumber,
+        from: inTx.blockNumber,
+        to: inTx.to,
+        gas: inTx.gas,
+        gasUsed: inTx.gasUsed,
+        input: inTx.input,
+        timestamp: Number(inTx.timestamp || "0"),
+        type: inTx.type,
+        value: inTx.value,
+        transactionHash: inTx.transactionHash,
+      }));
+
+      await this.prisma.internalTransaction.createMany({
+        data: internalTxMap,
+      });
+    }
   }
 
   async startFetchingBlockData(blockNumber: number): Promise<void> {

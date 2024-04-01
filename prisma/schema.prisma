@@ -15,36 +15,56 @@ datasource db {
 
 // Define the PostgreSQL data model
 model Block {
-  number      Int           @id
-  hash        String        @unique
-  parentHash  String
-  nonce       String?
-  difficulty  Int
-  gasLimit    String
-  gasUsed     String
-  miner       String
-  timestamp   Int
-  extraData   String
-  Transaction Transaction[]
-  Log         Log[]
+  number       Int           @id
+  hash         String        @unique
+  parentHash   String
+  nonce        String?
+  difficulty   Int
+  gasLimit     String
+  gasUsed      String
+  miner        String
+  timestamp    Int
+  extraData    String
+  Transactions Transaction[]
+  Logs         Log[]
 }
 
 model Transaction {
-  id          Int     @default(autoincrement())
-  hash        String  @id
-  blockNumber Int
-  blockHash   String
-  nonce       Int
-  from        String
-  to          String?
-  value       String
-  gas         String
-  gasPrice    String?
-  input       String
+  id            Int     @default(autoincrement())
+  hash          String  @id
+  blockNumber   Int
+  blockHash     String
+  nonce         Int
+  from          String
+  to            String?
+  value         String
+  gas           String
+  gasPrice      String?
+  data          String
+  confirmations Int
 
   // Define a relation to the Block model
-  block Block @relation(fields: [blockNumber], references: [number])
-  Log   Log[]
+  blocks               Block                 @relation(fields: [blockNumber], references: [number])
+  logs                 Log[]
+  internalTransactions InternalTransaction[]
+}
+
+model InternalTransaction {
+  id              Int    @id @default(autoincrement())
+  transactionHash String
+  blockNumber     Int
+  blockHash       String
+  from            String
+  to              String
+  value           String
+  input           String
+  type            String // Type of internal transaction (e.g., 'call', 'delegatecall', etc.)
+  gas             String
+  gasUsed         String
+  timestamp       Int
+
+  // Define a relation to the Transaction model
+  transactions Transaction @relation(fields: [transactionHash], references: [hash])
 }
 
 model Log {
