@@ -47,7 +47,7 @@ sub.subscribe(
 sub.on("message", (channel, message) => {
   if (channel === "block") {
     const block = JSON.parse(message);
-    dataIngester.storeTransaction(block);
+    dataIngester.storeBlock(block);
   }
 
   if (channel === "transaction") {
